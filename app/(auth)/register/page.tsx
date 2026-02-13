@@ -128,7 +128,7 @@ export default function RegisterPage() {
             {/* Name Field */}
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                Name (Optional)
+                Name
               </label>
               <input
                 id="name"
@@ -138,7 +138,7 @@ export default function RegisterPage() {
                 value={formData.name}
                 onChange={handleChange}
                 className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="John Doe"
+                placeholder="Enter your name"
               />
             </div>
 
@@ -156,7 +156,7 @@ export default function RegisterPage() {
                 value={formData.email}
                 onChange={handleChange}
                 className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="you@example.com"
+                placeholder="Enter your email"
               />
             </div>
 
