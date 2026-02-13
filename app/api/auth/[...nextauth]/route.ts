@@ -1,7 +1,6 @@
 import NextAuth from 'next-auth';
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import bcrypt from 'bcryptjs';
 import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 
@@ -21,18 +20,17 @@ export const authOptions: NextAuthOptions = {
 
           await connectDB();
 
+          // Add .select('+password') to get the password field
           const user = await User.findOne({
             email: credentials.email.toLowerCase(),
-          });
+          }).select('+password');
 
           if (!user) {
             throw new Error('No user found with this email');
           }
 
-          const isPasswordValid = await bcrypt.compare(
-            credentials.password,
-            user.password
-          );
+          // Use the comparePassword method from the User model
+          const isPasswordValid = await user.comparePassword(credentials.password);
 
           if (!isPasswordValid) {
             throw new Error('Invalid password');
@@ -73,7 +71,7 @@ export const authOptions: NextAuthOptions = {
         session.user.email = token.email as string;
         session.user.name = token.name as string | null;
       }
-      return session;
+      return token;
     },
   },
   secret: process.env.NEXTAUTH_SECRET,
