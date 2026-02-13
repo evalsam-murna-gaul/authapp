@@ -16,7 +16,9 @@ export async function POST(req: NextRequest) {
 
     await connectDB();
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    // Need to select the reset fields to update them
+    const user = await User.findOne({ email: email.toLowerCase() })
+      .select('+resetPasswordToken +resetPasswordExpires');
 
     if (!user) {
       // Don't reveal if user exists or not for security
@@ -35,7 +37,18 @@ export async function POST(req: NextRequest) {
     // Save token to user (expires in 1 hour)
     user.resetPasswordToken = hashedToken;
     user.resetPasswordExpires = new Date(Date.now() + 3600000); // 1 hour
+    
+    // Important: Mark fields as modified
+    user.markModified('resetPasswordToken');
+    user.markModified('resetPasswordExpires');
+    
     await user.save();
+
+    console.log('Token saved:', {
+      email: user.email,
+      tokenPreview: resetToken.substring(0, 10) + '...',
+      expires: user.resetPasswordExpires
+    });
 
     // In production, you would send an email here
     // For now, we return the token to display on screen

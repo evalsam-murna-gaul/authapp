@@ -26,24 +26,44 @@ export async function POST(req: NextRequest) {
     // Hash the token from URL to compare with DB
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
+    console.log('Looking for token:', {
+      tokenPreview: token.substring(0, 10) + '...',
+      hashedPreview: hashedToken.substring(0, 10) + '...',
+      currentTime: new Date(),
+    });
+
     // Find user with valid token that hasn't expired
     const user = await User.findOne({
       resetPasswordToken: hashedToken,
       resetPasswordExpires: { $gt: Date.now() },
-    }).select('+resetPasswordToken +resetPasswordExpires');
+    }).select('+resetPasswordToken +resetPasswordExpires +password');
 
     if (!user) {
+      // Debug: Check if user exists with this token (even if expired)
+      const expiredUser = await User.findOne({
+        resetPasswordToken: hashedToken,
+      }).select('+resetPasswordToken +resetPasswordExpires');
+
+      console.log('User lookup failed:', {
+        foundExpiredToken: !!expiredUser,
+        tokenExpiry: expiredUser?.resetPasswordExpires,
+      });
+
       return NextResponse.json(
         { error: 'Invalid or expired reset token' },
         { status: 400 }
       );
     }
 
+    console.log('User found, resetting password for:', user.email);
+
     // Update password
     user.password = password;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
     await user.save();
+
+    console.log('Password reset successful for:', user.email);
 
     return NextResponse.json({
       message: 'Password reset successful!',
