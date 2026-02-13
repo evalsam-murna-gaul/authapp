@@ -71,7 +71,7 @@ export const authOptions: NextAuthOptions = {
         session.user.email = token.email as string;
         session.user.name = token.name as string | null;
       }
-      return token;
+      return session; // CHANGED FROM 'return token' TO 'return session'
     },
   },
   secret: process.env.NEXTAUTH_SECRET,
