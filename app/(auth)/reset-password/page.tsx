@@ -1,67 +1,87 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
-// Separate component that uses useSearchParams
-function LoginForm() {
+function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    rememberMe: false,
-  });
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
+  const token = searchParams.get('token');
 
-  // Check if user just registered
+  const [formData, setFormData] = useState({
+    password: '',
+    confirmPassword: '',
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
   useEffect(() => {
-    if (searchParams.get('registered') === 'true') {
-      setSuccessMessage('Registration successful! Please login.');
+    if (!token) {
+      setError('Invalid or missing reset token');
     }
-  }, [searchParams]);
+  }, [token]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
     setFormData({
       ...formData,
-      [name]: type === 'checkbox' ? checked : value,
+      [e.target.name]: e.target.value,
     });
-    setError(''); // Clear error when user types
+    setError('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setSuccessMessage('');
+    setMessage('');
 
-    // Validate form
-    if (!formData.email || !formData.password) {
-      setError('Please enter both email and password');
+    // Validate
+    if (!formData.password || !formData.confirmPassword) {
+      setError('Please fill in all fields');
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    if (!token) {
+      setError('Invalid reset token');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const result = await signIn('credentials', {
-        redirect: false,
-        email: formData.email,
-        password: formData.password,
+      const response = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          token,
+          password: formData.password,
+        }),
       });
 
-      if (result?.error) {
-        setError(result.error);
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage(data.message);
+        setTimeout(() => {
+          router.push('/login');
+        }, 2000);
       } else {
-        // Success - redirect to dashboard
-        router.push('/dashboard');
-        router.refresh();
+        setError(data.error || 'Something went wrong');
       }
-    } catch (err: any) {
+    } catch (err) {
       setError('An unexpected error occurred');
     } finally {
       setIsLoading(false);
@@ -74,105 +94,79 @@ function LoginForm() {
         {/* Header */}
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to your account
+            Set new password
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Don't have an account?{' '}
-            <Link
-              href="/register"
-              className="font-medium text-blue-600 hover:text-blue-500"
-            >
-              Create one
-            </Link>
+            Enter your new password below
           </p>
         </div>
 
-        {/* Success Message */}
-        {successMessage && (
-          <div className="rounded-md bg-green-50 p-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg
-                  className="h-5 w-5 text-green-400"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-green-800">{successMessage}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Form */}
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm space-y-4">
-            {/* Email Field */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={formData.email}
-                onChange={handleChange}
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Enter your email"
-              />
-            </div>
-
-            {/* Password Field */}
+          <div className="space-y-4">
+            {/* New Password */}
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                Password
+                New Password
               </label>
               <input
                 id="password"
                 name="password"
                 type="password"
-                autoComplete="current-password"
                 required
                 value={formData.password}
                 onChange={handleChange}
                 className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Enter your password"
+                placeholder="Enter new password"
               />
             </div>
-          </div>
 
-          {/* Remember Me & Forgot Password */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                id="rememberMe"
-                name="rememberMe"
-                type="checkbox"
-                checked={formData.rememberMe}
-                onChange={handleChange}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label htmlFor="rememberMe" className="ml-2 block text-sm text-gray-900">
-                Remember me
+            {/* Confirm Password */}
+            <div>
+              <label
+                htmlFor="confirmPassword"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Confirm Password
               </label>
-            </div>
-
-            <div className="text-sm">
-              <Link href="/forgot-password" className="font-medium text-blue-600 hover:text-blue-500">
-                Forgot password?
-              </Link>
+              <input
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                required
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                placeholder="Confirm new password"
+              />
             </div>
           </div>
+
+          {/* Success Message */}
+          {message && (
+            <div className="rounded-md bg-green-50 p-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg
+                    className="h-5 w-5 text-green-400"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-green-800">
+                    {message} Redirecting to login...
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Error Message */}
           {error && (
@@ -202,7 +196,7 @@ function LoginForm() {
           <div>
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || !token}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
               {isLoading ? (
@@ -227,12 +221,22 @@ function LoginForm() {
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     ></path>
                   </svg>
-                  Signing in...
+                  Resetting...
                 </span>
               ) : (
-                'Sign in'
+                'Reset Password'
               )}
             </button>
+          </div>
+
+          {/* Back to Login */}
+          <div className="text-center">
+            <Link
+              href="/login"
+              className="text-sm font-medium text-blue-600 hover:text-blue-500"
+            >
+              Back to login
+            </Link>
           </div>
         </form>
       </div>
@@ -240,15 +244,16 @@ function LoginForm() {
   );
 }
 
-// Main page component with Suspense wrapper
-export default function LoginPage() {
+export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-600">Loading...</div>
-      </div>
-    }>
-      <LoginForm />
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="text-gray-600">Loading...</div>
+        </div>
+      }
+    >
+      <ResetPasswordForm />
     </Suspense>
   );
 }
