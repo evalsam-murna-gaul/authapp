@@ -1,7 +1,7 @@
 import NextAuth from 'next-auth';
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import bcrypt from 'bcryptjs'; 
+import bcrypt from 'bcryptjs';
 import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 
@@ -15,36 +15,50 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         try {
+          // ✅ Check if credentials exist
           if (!credentials?.email || !credentials?.password) {
+            console.error('Missing credentials');
             throw new Error('Email and password are required');
           }
 
+          console.log('Attempting login for:', credentials.email);
+
           await connectDB();
 
+          // ✅ Find user and select password field explicitly
           const user = await User.findOne({
             email: credentials.email.toLowerCase(),
-          });
+          }).select('+password'); // Make sure password is included
 
           if (!user) {
-            console.log('User not found:', credentials.email);
-            throw new Error('No user found with this email');
+            console.error('User not found:', credentials.email);
+            throw new Error('Invalid email or password');
+          }
+
+          // ✅ Check if user.password exists
+          if (!user.password) {
+            console.error('User has no password stored');
+            throw new Error('Invalid account data');
           }
 
           console.log('User found, comparing passwords...');
-          console.log('Stored hash:', user.password);
-          console.log('Input password length:', credentials.password.length);
+          console.log('Password exists:', !!user.password);
+          console.log('Input password exists:', !!credentials.password);
 
-          // Use bcryptjs compare
+          // ✅ Now compare - both should be defined
           const isPasswordValid = await bcrypt.compare(
             credentials.password,
             user.password
           );
 
-          console.log('Password valid?', isPasswordValid);
+          console.log('Password valid:', isPasswordValid);
 
           if (!isPasswordValid) {
-            throw new Error('Invalid password');
+            console.error('Invalid password for user:', credentials.email);
+            throw new Error('Invalid email or password');
           }
+
+          console.log('Login successful for:', credentials.email);
 
           return {
             id: user._id.toString(),
@@ -52,7 +66,7 @@ export const authOptions: NextAuthOptions = {
             name: user.name || null,
           };
         } catch (error: any) {
-          console.error('Auth error:', error);
+          console.error('Auth error:', error.message);
           throw error;
         }
       },
