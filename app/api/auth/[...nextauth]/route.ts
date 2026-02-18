@@ -1,6 +1,7 @@
 import NextAuth from 'next-auth';
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import bcrypt from 'bcryptjs'; 
 import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 
@@ -20,17 +21,26 @@ export const authOptions: NextAuthOptions = {
 
           await connectDB();
 
-          // Add .select('+password') to get the password field
           const user = await User.findOne({
             email: credentials.email.toLowerCase(),
-          }).select('+password');
+          });
 
           if (!user) {
+            console.log('User not found:', credentials.email);
             throw new Error('No user found with this email');
           }
 
-          // Use the comparePassword method from the User model
-          const isPasswordValid = await user.comparePassword(credentials.password);
+          console.log('User found, comparing passwords...');
+          console.log('Stored hash:', user.password);
+          console.log('Input password length:', credentials.password.length);
+
+          // Use bcryptjs compare
+          const isPasswordValid = await bcrypt.compare(
+            credentials.password,
+            user.password
+          );
+
+          console.log('Password valid?', isPasswordValid);
 
           if (!isPasswordValid) {
             throw new Error('Invalid password');
@@ -54,7 +64,7 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 30 * 24 * 60 * 60,
   },
   callbacks: {
     async jwt({ token, user }) {
@@ -71,11 +81,11 @@ export const authOptions: NextAuthOptions = {
         session.user.email = token.email as string;
         session.user.name = token.name as string | null;
       }
-      return session; // CHANGED FROM 'return token' TO 'return session'
+      return session;
     },
   },
   secret: process.env.NEXTAUTH_SECRET,
-  debug: true, // Enable debug mode to see errors
+  debug: true,
 };
 
 const handler = NextAuth(authOptions);
